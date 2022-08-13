@@ -16,6 +16,20 @@ conda env create -f environment.yml
 conda activate DeNovoAssembly
 ```
 
+### Update
+If you already have the pipeline installed, you can update it using the following commands:
+```
+# Navigate to your installation directory
+cd de-novo-assembly-pipeline
+
+# Use git pull to get the lastest update
+git pull
+
+# Activate the conda environment and use the environment.yml file to download updates
+conda activate DeNovoAssembly
+conda env update --file environment.yml --prune
+```
+
 ## Usage
 
 To run the pipeline, use the following command:
