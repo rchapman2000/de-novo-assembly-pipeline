@@ -18,8 +18,6 @@ OPTIONS:
 
 --output OUTPUT_DIR - [Required] A directory to place output files (If not existing, pipeline will create)
 
---ref REFERENCE_FASTA - [Required] The pipeline will align contigs produced by assembly to this reference
-
 --adapters ADAPTER_FASTA - [Required] A fasta file containing adapters to be trimmed
 
 ONE OF THE FOLLOWING IS REQUIRED:
@@ -29,6 +27,8 @@ ONE OF THE FOLLOWING IS REQUIRED:
 
 OPTIONAL:
         --threads INT - the number of threads that can be use to run pipeline tools in parallel
+
+        --ref REFERENCE_FASTA - The pipeline will align contigs produced by assembly to this reference
     """
 }
 
@@ -188,19 +188,16 @@ else {
 
 // Parses the ref option.
 refFile = ''
-if (params.ref == false) {
-    // If the parameter is not set, notify the user and exit.
-    println "ERROR: no reference file provided. Pipeline requires a reference file."
-    exit(1)
-}
-else if (!(file(params.ref).exists())) {
-    // If the reference file did not exist, notify the user and exit.
-    println "ERROR: ${params.ref} does not exist."
-    exit(1)
-}
-else {
-    // Parse the provided file into a file object.
-    refFile = file(params.ref)
+if (params.ref != false) {
+    if (!(file(params.ref).exists())) {
+        // If the reference file did not exist, notify the user and exit.
+        println "ERROR: ${params.ref} does not exist."
+        exit(1)
+    }
+    else {
+        // Parse the provided file into a file object.
+        refFile = file(params.ref)
+    }
 }
 
 
@@ -252,6 +249,8 @@ workflow {
     // Perform de novo assembly using spades.
     Assembly( Host_Read_Removal.out[0], outDir, params.threads )
 
-    // Align the contigs to a reference genome using minimap2 and samtools
-    Contig_Alignment( Assembly.out, outDir, refFile )
+    if (params.ref != false) {
+        // Align the contigs to a reference genome using minimap2 and samtools
+        Contig_Alignment( Assembly.out, outDir, refFile )
+    }
 }
