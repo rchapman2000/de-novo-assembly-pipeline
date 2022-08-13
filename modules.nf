@@ -189,7 +189,7 @@ process Host_Read_Removal {
 }
 
 // Uses spades to produce a de novo assembly.
-process Assembly {
+process Spades_Assembly {
     input:
         // Tuple contains the file basename and paired-end reads.
         tuple val(base), file(R1), file(R2)
@@ -213,6 +213,33 @@ process Assembly {
     #!/bin/bash
 
     spades.py --threads ${threads} -1 ${R1} -2 ${R2} -o ${base}-Assembly
+    """
+}
+
+process Unicycler_Assembly {
+    input:
+        // Tuple contains the file basename and paired-end reads.
+        tuple val(base), file(R1), file(R2)
+        // The name of the output directory.
+        val outDir
+        // The number of threads provided.
+        val threads
+    
+    output:
+        // Tuple contains the basename of the sample and the assembly directory 
+        // produced by spades.
+        tuple val(base), file("${base}-Assembly")
+    
+    publishDir "${outDir}", mode: 'copy'
+
+    script:
+    /*
+    Runs unicycler using the provided paired-end reads.
+    */
+    """
+    #!/bin/bash
+
+    unicycler --threads ${threads} -1 ${R1} -2 ${R2} -o ${base}-Assembly
     """
 }
 

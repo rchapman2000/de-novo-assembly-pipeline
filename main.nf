@@ -10,7 +10,7 @@ Takes an input of paired-end fastq files from illumina
 sequencers, processes the reads, removes host contamination,
 and performs a de novo assembly.
 
-USAGE: nextflow run main.nf [options] --input INPUT_DIR --output OUTPUT_DIR --ref REFERENCE_FASTA --adapters ADAPTER_FASTA [--host_fasta HOST_FASTA | --host_bt2_index INDEX_DIR]
+USAGE: nextflow run main.nf [options] --input INPUT_DIR --output OUTPUT_DIR --adapters ADAPTER_FASTA [--host_fasta HOST_FASTA | --host_bt2_index INDEX_DIR]
 
 OPTIONS:
 
@@ -20,15 +20,17 @@ OPTIONS:
 
 --adapters ADAPTER_FASTA - [Required] A fasta file containing adapters to be trimmed
 
-ONE OF THE FOLLOWING IS REQUIRED:
+HOST REMOVAL (ONE OF THE FOLLOWING IS [Required]):
     --host_fasta HOST_FASTA - A host fasta file that the reads will be aligned to to remove host contamination
             
     --host_bt2_index INDEX_DIRECTORY - To save time, an existing bowtie2 index can be supplied. Must be in its own directory
 
 OPTIONAL:
-        --threads INT - the number of threads that can be use to run pipeline tools in parallel
+    --unicycler - assembles reads using unicycler in place of spades
 
-        --ref REFERENCE_FASTA - The pipeline will align contigs produced by assembly to this reference
+    --threads INT - the number of threads that can be use to run pipeline tools in parallel
+
+    --ref REFERENCE_FASTA - The pipeline will align contigs produced by assembly to this reference
     """
 }
 
@@ -67,6 +69,7 @@ params.ref = false
 params.output = false
 params.threads = 1
 params.adapters = false
+params.unicycler = false
 
 // Inports modules
 include { Index_Host_Reference } from './modules.nf'
@@ -78,7 +81,8 @@ include { QC_Report as QC_Report_Deduped} from './modules.nf'
 include { Trimming } from './modules.nf'
 include { Remove_PCR_Duplicates } from './modules.nf'
 include { Host_Read_Removal } from './modules.nf'
-include { Assembly } from './modules.nf'
+include { Spades_Assembly } from './modules.nf'
+include { Unicycler_Assembly } from './modules.nf'
 include { Contig_Alignment } from './modules.nf'
 
 // Checks the input parameter
@@ -246,11 +250,25 @@ workflow {
         Host_Read_Removal(Remove_PCR_Duplicates.out[0], outDir, hostRefIdxData, params.threads )
     }
 
-    // Perform de novo assembly using spades.
-    Assembly( Host_Read_Removal.out[0], outDir, params.threads )
-
-    if (params.ref != false) {
-        // Align the contigs to a reference genome using minimap2 and samtools
-        Contig_Alignment( Assembly.out, outDir, refFile )
+    // If the user supplied the --unicycler parameter, use unicycler for
+    // assembly
+    if (params.unicycler != false) {
+        // Performs de novo assembly using unicycler
+        Unicycler_Assembly( Host_Read_Removal.out[0], outDir, params.threads)
+        
+        if (params.ref != false) {
+            // Align the contigs to a reference genome using minimap2 and samtools
+            Contig_Alignment( Unicycler_Assembly.out, outDir, refFile )
+        }
     }
+    else {
+        // Perform de novo assembly using spades.
+        Spades_Assembly( Host_Read_Removal.out[0], outDir, params.threads )
+
+        if (params.ref != false) {
+            // Align the contigs to a reference genome using minimap2 and samtools
+            Contig_Alignment( Spades_Assembly.out, outDir, refFile )
+        }
+    }
+
 }

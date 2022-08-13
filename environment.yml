@@ -79,6 +79,7 @@ dependencies:
   - llvm-openmp=8.0.1=hc9558a2_0
   - lz4-c=1.9.3=h9c3ff4c_1
   - matplotlib-base=3.5.2=py39h700656a_1
+  - miniasm=0.3_r179=h7132678_3
   - minimap2=2.24=h7132678_1
   - mummer=3.23=pl5321h1b792b2_13
   - munkres=1.1.4=pyh9f0ad1d_0
@@ -146,6 +147,7 @@ dependencies:
   - python-dateutil=2.8.2=pyhd8ed1ab_0
   - python_abi=3.9=2_cp39
   - quast=5.2.0=py39pl5321h2add14b_1
+  - racon=1.5.0=h7ff8a90_0
   - ragtag=2.1.0=pyhb7b1952_0
   - readline=8.1.2=h0f457ee_0
   - samtools=1.15.1=h1170115_0
@@ -161,6 +163,7 @@ dependencies:
   - trimmomatic=0.39=hdfd78af_2
   - tzdata=2022a=h191b570_0
   - unicodedata2=14.0.0=py39hb9d737c_1
+  - unicycler=0.5.0=py39h2add14b_1
   - wheel=0.37.1=pyhd8ed1ab_0
   - xorg-libxau=1.0.9=h7f98852_0
   - xorg-libxdmcp=1.1.3=h7f98852_0
