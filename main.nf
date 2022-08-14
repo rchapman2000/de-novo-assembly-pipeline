@@ -117,6 +117,7 @@ outDir = ''
 if (params.output == false) {
     // If the parameter is not set, notify the user and exit.
     println "ERROR: No output directory provided. Pipeline requires an output directory."
+    exit(1)
 }
 else {
     // If the parameter is set, ensure that the directory provided ends
