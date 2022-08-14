@@ -69,6 +69,8 @@ process Trimming {
         val outDir
         // The adapter file in fasta format.
         file adapters
+        //The minimum read lenths to be allowed post trimming
+        val minLen
 
     output:
         // Tuple containing the file basename and the trimmed forward and reverse reads
@@ -100,7 +102,7 @@ process Trimming {
 
     trimmomatic PE ${R1} ${R2} ${base}_1.trimmed.fastq ${base}_1.unpaired.fastq \
     ${base}_2.trimmed.fastq ${base}_2.unpaired.fastq ILLUMINACLIP:${adapters}:2:30:10:1:true \
-    LEADING:5 TRAILING:5 SLIDINGWINDOW:4:20 MINLEN:75
+    LEADING:5 TRAILING:5 SLIDINGWINDOW:4:20 MINLEN:${minLen}
 
     gzip ${base}_1.unpaired.fastq ${base}_2.unpaired.fastq
     """
