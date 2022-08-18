@@ -18,8 +18,6 @@ OPTIONS:
 
 --output OUTPUT_DIR - [Required] A directory to place output files (If not existing, pipeline will create)
 
---adapters ADAPTER_FASTA - [Required] A fasta file containing adapters to be trimmed
-
 HOST REMOVAL (ONE OF THE FOLLOWING IS [Required]):
     --host_fasta HOST_FASTA - A host fasta file that the reads will be aligned to to remove host contamination
             
@@ -70,7 +68,6 @@ params.host_bt2_index = false
 params.ref = false
 params.output = false
 params.threads = 1
-params.adapters = false
 params.unicycler = false
 params.minLen = 75
 
@@ -79,14 +76,17 @@ include { Index_Host_Reference } from './modules.nf'
 include { QC_Report } from './modules.nf'
 // The same module cannot be used more than once,
 // thus it is aliased to be used multiple times.
-include { QC_Report as QC_Report_Trimmed} from './modules.nf'
-include { QC_Report as QC_Report_Deduped} from './modules.nf'
+include { QC_Report as QC_Report_Trimmed } from './modules.nf'
+include { QC_Report as QC_Report_Deduped } from './modules.nf'
+include { QC_Report as QC_Report_Host_Removed } from './modules.nf'
 include { Trimming } from './modules.nf'
 include { Remove_PCR_Duplicates } from './modules.nf'
 include { Host_Read_Removal } from './modules.nf'
 include { Spades_Assembly } from './modules.nf'
 include { Unicycler_Assembly } from './modules.nf'
 include { Contig_Alignment } from './modules.nf'
+
+adapters = file("${baseDir}/adapters.fa")
 
 // Checks the input parameter
 if (params.input == false) {
@@ -209,23 +209,6 @@ if (params.ref != false) {
 }
 
 
-// Parse the adapters option
-adapters = ''
-if (params.adapters == false) {
-    // If the parameter is not set, notify the user and exit.
-    println "ERROR: no adapters provided. Pipeline requires a specified adapter file"
-    exit(1)
-}
-else if (!(file(params.adapters).exists())) {
-    // If the adapters file does not exist, notify the user and exit.
-    println "ERROR: ${params.adapters} does not exist."
-    exit(1)
-}
-else {
-    // Parse the provided file into a file object.
-    adapters = file("${params.adapters}")
-}
-
 
 workflow {
     // Use FASTQC to perform an initial QC check on the reads
@@ -251,8 +234,10 @@ workflow {
     }
     // If the user supplied an existing bowtie2 index, use that for alignment.
     else {
-        Host_Read_Removal(Remove_PCR_Duplicates.out[0], outDir, hostRefIdxData, params.threads )
+        Host_Read_Removal( Remove_PCR_Duplicates.out[0], outDir, hostRefIdxData, params.threads )
     }
+
+    QC_Report_Host_Removed( Host_Read_Removal.out[0], outDir, "FASTQC-Host-Removed", params.threads )
 
     // If the user supplied the --unicycler parameter, use unicycler for
     // assembly
