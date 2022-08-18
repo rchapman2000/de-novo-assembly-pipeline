@@ -10,7 +10,7 @@ Takes an input of paired-end fastq files from illumina
 sequencers, processes the reads, removes host contamination,
 and performs a de novo assembly.
 
-USAGE: nextflow run main.nf [options] --input INPUT_DIR --output OUTPUT_DIR --adapters ADAPTER_FASTA [--host_fasta HOST_FASTA | --host_bt2_index INDEX_DIR]
+USAGE: nextflow run main.nf [options] --input INPUT_DIR --output OUTPUT_DIR [--host_fasta HOST_FASTA | --host_bt2_index INDEX_DIR]
 
 OPTIONS:
 
