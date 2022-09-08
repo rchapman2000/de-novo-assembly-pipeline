@@ -34,11 +34,21 @@ conda env update --file environment.yml --prune
 
 To run the pipeline, use the following command:
 ```
-nextflow run main.nf [options] --input INPUT_DIR --output OUTPUT_DIR --adapters ADAPTER_FASTA [--host_fasta HOST_FASTA | --host_bt2_index INDEX_DIR]
+nextflow run main.nf [options] --input INPUT_DIR --output OUTPUT_DIR [--host_fasta HOST_FASTA | --host_bt2_index INDEX_DIR]
 ```
 
 ### Options
-Documentation to be added. To view the list of options, use the following command:
+The pipeline also supports the following optional arguments:
+
+| Option | Type | Description |
+|---|---|---|
+| --unicycler | *None* | This pipeline also supports assembly using the tool unicycler. Supplying this option will use unicycler as opposed to SPADES (Default). |
+| --ref | *Fasta File* | If provided a reference fasta file, this pipeline will align the generated contigs/scaffolds to this file using minimap2 |
+| --minCov | *int* | The minimum depth of coverage, below which a a position will be masked. [Default = 20] |
+| --minLen | *int* | The minimum length of a read (in base pairs) to keep post trimming. [Default = 75] |
+| --threads | *int* | The number of threads that can be use to run pipeline tools in parallel. [Default = 1] |
+
+To view the list of options from the command line, use the following command:
 ```
 nextflow rn main.nf --help
 ```

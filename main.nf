@@ -72,6 +72,7 @@ params.unicycler = false
 params.minLen = 75
 
 // Inports modules
+include { Setup } from "./modules.nf"
 include { Index_Host_Reference } from './modules.nf'
 include { QC_Report } from './modules.nf'
 // The same module cannot be used more than once,
@@ -85,6 +86,7 @@ include { Host_Read_Removal } from './modules.nf'
 include { Spades_Assembly } from './modules.nf'
 include { Unicycler_Assembly } from './modules.nf'
 include { Contig_Alignment } from './modules.nf'
+include { Write_Summary } from './modules.nf'
 
 adapters = file("${baseDir}/adapters.fa")
 
@@ -123,8 +125,9 @@ else {
     // If the parameter is set, ensure that the directory provided ends
     // in a trailing slash (to keep things consistent throughout) the
     // pipeline code.
-    outDir = checkDirectoryEnding(params.output)
+    outDir = file(checkDirectoryEnding(params.output))
 }
+println outDir
 
 // Parses the host options (--host_fasta and --host_bt2_index).
 // For this, we cannot use a channel like we did for the input files
@@ -133,6 +136,7 @@ else {
 // step and the alignment step.
 hostRefData = ''
 hostRefIdxData = ''
+hostRefName = ''
 if (params.host_fasta == false && params.host_bt2_index == false) {
     // If both options are not supplied, notify the user and exit.
     println "ERROR: no host reference file or bowtie2 index proivded. Pipeline requires either a reference fasta file or bowtie2 index."
@@ -208,9 +212,15 @@ if (params.ref != false) {
     }
 }
 
-
+assembler = 'SPADES'
+if (params.unicycler != false) {
+    assembler = "Unicycler"
+}
 
 workflow {
+
+    Setup( hostRefName, params.minLen, assembler, outDir )
+
     // Use FASTQC to perform an initial QC check on the reads
     QC_Report( inputFiles_ch, outDir, "FASTQC-Pre-Processing", params.threads )
 
@@ -247,17 +257,20 @@ workflow {
         
         if (params.ref != false) {
             // Align the contigs to a reference genome using minimap2 and samtools
-            Contig_Alignment( Unicycler_Assembly.out, outDir, refFile )
+            Contig_Alignment( Unicycler_Assembly.out[0], outDir, refFile )
         }
+
+        Write_Summary(inputFiles_ch, Setup.out[1], Trimming.out[2], Remove_PCR_Duplicates.out[2], Host_Read_Removal.out[2], Unicycler_Assembly.out[1], outDir )
     }
     else {
         // Perform de novo assembly using spades.
         Spades_Assembly( Host_Read_Removal.out[0], outDir, params.threads )
-
         if (params.ref != false) {
             // Align the contigs to a reference genome using minimap2 and samtools
-            Contig_Alignment( Spades_Assembly.out, outDir, refFile )
+            Contig_Alignment( Spades_Assembly.out[0], outDir, refFile )
         }
+
+        Write_Summary(inputFiles_ch, Setup.out[1], Trimming.out[2], Remove_PCR_Duplicates.out[2], Host_Read_Removal.out[2], Spades_Assembly.out[2], outDir )
     }
 
 }
