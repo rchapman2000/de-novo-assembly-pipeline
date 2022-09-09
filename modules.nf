@@ -35,10 +35,10 @@ process Setup {
 
     The summary file contains:
         1. The sample
-        2. Raw Read counts for R1 and R2
-        3. Reads after trimming for R1 and R2
-        4. Reads after deduplication for R1 and R2
-        5. Reads after host removal for R1 and R2
+        2. Raw Reads
+        3. Reads after trimming
+        4. Reads after deduplication
+        5. Reads after host removal
         6. Number of contigs
         7. Number of scaffolds
     */
@@ -53,7 +53,7 @@ process Setup {
 
     touch stats-summary.csv
 
-    echo "Sample,Raw Reads R1,Trimmed Reads R1,Deduped Reads R1,Non-Host Reads R1,Raw Reads R2,Trimmed Reads R2,Deduped Reads R2,Non-Host Reads R2,Contigs Generated,Scaffolds Generated" > stats-summary.csv
+    echo "Sample,Raw Reads,Trimmed Reads,Deduped Reads,Non-Host Reads,Contigs Generated,Scaffolds Generated" > stats-summary.csv
     """
 }
 
@@ -136,13 +136,16 @@ process Trimming {
         tuple val(base), file("${base}_1.trimmed.fastq"), file("${base}_2.trimmed.fastq")
         // Tuple containing the unpaired read files.
         tuple file("${base}_1.unpaired.fastq.gz"), file("${base}_2.unpaired.fastq.gz") 
-        // Tuple containing the raw and trimmed read counts for the paired-end sample.
-        tuple env(raw_reads_1), env(raw_reads_2), env(trimmed_reads_1), env(trimmed_reads_2)
+        // The summary string containing the sample and raw/trimmed read counts.
+        env summary
 
     publishDir "${outDir}/${base}-Processed-Reads", mode: 'copy'
 
     script:
     /*
+    The number of raw reads in the forward and reverse files are grabbed
+    and used to calculate the total raw reads.
+
     Uses trimmomatic to trim the read files.
     Trimmomatic performs trimming steps in the order provided in the 
     command line. Our steps:
@@ -156,15 +159,20 @@ process Trimming {
     5. MINLEN: Removes reads less than 75 bp long.
 
     Prinseq (used in the following process) cannot take gzipped reads as input. Thus,
-    only the unpaired reads are gzipped to save space.
+    only the unpaired reads are gzipped to save space. 
 
-    Additionally, a count of the raw and trimmed reads are taking
+    Finally, the forward and reverse reads post trimming are grabbed and used
+    to calculate the total trimmed reads.
+
+    The sample, raw reads, and trimmed reads are added to the summary string.
     */
     """
     #!/bin/bash
 
     raw_reads_1=\$((\$(gunzip -c ${R1} | wc -l)/4))
     raw_reads_2=\$((\$(gunzip -c ${R1} | wc -l)/4))
+
+    total_raw=\$((\$raw_reads_1 + \$raw_reads_2))
 
     trimmomatic PE ${R1} ${R2} ${base}_1.trimmed.fastq ${base}_1.unpaired.fastq \
     ${base}_2.trimmed.fastq ${base}_2.unpaired.fastq ILLUMINACLIP:${adapters}:2:30:10:1:true \
@@ -174,6 +182,10 @@ process Trimming {
     
     trimmed_reads_1=\$((\$(cat ${base}_1.trimmed.fastq | wc -l)/4))
     trimmed_reads_2=\$((\$(cat ${base}_2.trimmed.fastq | wc -l)/4))
+
+    total_trimmed=\$((\$trimmed_reads_1 + \$trimmed_reads_2))
+
+    summary="${base},\$total_raw,\$total_trimmed"
     """
         
 }
@@ -185,13 +197,15 @@ process Remove_PCR_Duplicates {
         tuple val(base), file(R1), file(R2)
         // The output directory
         file outDir
+        // The existing summary file
+        val existingSummary
     output:
         // Tuple containing the file basename and the deduped, paired-end reads.
         tuple val(base), file("${base}_deduped_1.fastq.gz"), file("${base}_deduped_2.fastq.gz")
         // The log file produced by prinseq for troubleshooting.
         file "${base}-prinseq-log.txt"
-        // Tuple containing the number of reads after deduplication for R1 and R2
-        tuple env(deduped_reads_1), env(deduped_reads_2)
+        // The summary string containing the number of reads after deduplication
+        env summary
 
     publishDir "${outDir}/${base}-Processed-Reads", mode: 'copy'
 
@@ -208,7 +222,10 @@ process Remove_PCR_Duplicates {
 
     The fastq files produced are gzipped to save space.
 
-    Counts of the reads after deduplication are also taken.
+    The forward and reverse reads post deduplication are grabbed
+    and summed to calculate the total deduplicated reads.
+
+    This value is added to the summary string.
     */
     script:
     """
@@ -220,6 +237,10 @@ process Remove_PCR_Duplicates {
 
     deduped_reads_1=\$((\$(gunzip -c ${base}_deduped_1.fastq | wc -l)/4))
     deduped_reads_2=\$((\$(gunzip -c ${base}_deduped_2.fastq | wc -l)/4))
+
+    total_deduped=\$((\$deduped_reads_1 + \$deduped_reads_2))
+
+    summary="${existingSummary},\$total_deduped"
     """
 }
 
@@ -234,14 +255,15 @@ process Host_Read_Removal {
         tuple file(refDir), val(refName)
         // The number of threads provided.
         val threads
-
+        // The existing summary string
+        val existingSummary
     output:
         // Tuple contains the file basename and the paired-end read files with host reads removed.
         tuple val(base), file("${base}_host_removed_1.fq.gz"), file("${base}_host_removed_2.fq.gz")
         // A directory containing the alignment to the host file.
         file "host-reads/${base}-host.sam"
-        // Tuple contains the number of reads after host removal for R1 and R2
-        tuple env(nonHost_reads_1), env(nonHost_reads_2)
+        // The summary string containing the number of reads after host removal
+        env summary
     
     publishDir "${outDir}/${base}-Processed-Reads", mode: 'copy'
 
@@ -256,7 +278,8 @@ process Host_Read_Removal {
 
     Additionally, the reads are gzipped to preserve space.
 
-    Finally, the number of reads after host removal are recorded.
+    Finally, the number of forward and reverse reads are grabbed and used to calculate
+    the total number of reads post host removal. This value is added to the summary string.
     */
     """
     #!/bin/bash
@@ -270,6 +293,10 @@ process Host_Read_Removal {
 
     nonHost_reads_1=\$((\$(gunzip -c ${base}_deduped_1.fastq | wc -l)/4))
     nonHost_reads_2=\$((\$(gunzip -c ${base}_deduped_2.fastq | wc -l)/4))
+
+    total_nonHost=\$((\$nonHost_reads_1 + \$nonHost_reads_2))
+
+    summary="${existingSummary},\$total_nonHost"
     """
 }
 
@@ -282,16 +309,16 @@ process Spades_Assembly {
         file outDir
         // The number of threads provided.
         val threads
-    
+        // The existing summary string
+        val existingSummary
     output:
         // Tuple contains the basename of the sample and the assembled contigs 
         // produced by spades.
         tuple val(base), file("${base}-contigs.fasta")
         // The scaffolds produced by spades
         file "${base}-scaffolds.fasta"
-        // Tuple contains the number of contigs and number of scaffolds
-        // produced by spades.
-        tuple env(numContigs), env(numScaffolds)
+        // The summary string containing the number of contigs and scaffolds
+        env summary
     
     publishDir "${outDir}", mode: 'copy'
 
@@ -301,6 +328,8 @@ process Spades_Assembly {
 
     The contigs and scaffolds are renamed and moved, and
     the number of contigs/scaffolds are recorded.
+    
+    The number of contigs and scaffolds are added to the summary string.
     */
     """
     #!/bin/bash
@@ -309,11 +338,13 @@ process Spades_Assembly {
 
     mv ${base}-Assembly/contigs.fasta ./${base}-contigs.fasta
 
-    numContigs=\$(grep ">" ${base}-contigs.fasta | wc -l)
+    num_contigs=\$(grep ">" ${base}-contigs.fasta | wc -l)
 
     mv ${base}-Assembly/scaffolds.fasta ./${base}-scaffolds.fasta
 
-    numScaffolds=\$(grep ">" ${base}-scaffolds.fasta | wc -l)
+    num_scaffolds=\$(grep ">" ${base}-scaffolds.fasta | wc -l)
+
+    summary="${existingSummary},\$num_contigs, \$num_scaffolds"
     """
 }
 
@@ -325,14 +356,14 @@ process Unicycler_Assembly {
         file outDir
         // The number of threads provided.
         val threads
-    
+        // The existing summary string
+        val existingSummary
     output:
         // Tuple contains the basename of the sample and the assembly directory 
         // produced by spades.
         tuple val(base), file("${base}-assembly.fasta")
-        // Tuple contains the number of contigs and number of scaffolds
-        // produced by spades.
-        tuple env(numContigs), env(numScaffolds)
+        // The summary string containing the number of scaffolds
+        env summary
     
     publishDir "${outDir}", mode: 'copy'
 
@@ -343,6 +374,9 @@ process Unicycler_Assembly {
     Unicycler only produces scaffolds, thus this file is moved/renamed,
     the number of scaffolds is recorded, and the number of contigs is set
     to a message letting the user know that these are not produced.
+
+    The number of scaffolds and message about contigs are added
+    to the summary string.
     */
     """
     #!/bin/bash
@@ -351,9 +385,11 @@ process Unicycler_Assembly {
 
     mv ${base}-Assembly/assembly.fasta ./${base}-assembly.fasta
     
-    numScaffolds=\$(grep ">" ${base}-assembly.fasta | wc -l)
+    num_scaffolds=\$(grep ">" ${base}-assembly.fasta | wc -l)
 
-    numContigs="Unicycler only produces contigs"
+    num_contigs="Unicycler only produces contigs"
+
+    summary="${existingSummary},\$num_contigs, \$num_scaffolds"
     """
 }
 
@@ -395,30 +431,20 @@ process Contig_Alignment {
 // Writes a line to the summary file for the sample.
 process Write_Summary {
     input:
-        // Tuple contains the sample basename and forward/reverse reads (the basename
-        // is the only value important to this function).
-        tuple val(base), file(F1), file(F2)
-        // The summary file created earlier.
-        file summary
-        // Tuple contains raw read and trimmed read counts for R1 and R2
-        tuple val(raw_reads_1), val(raw_reads_2), val(trimmed_reads_1), val(trimmed_reads_2)
-        // Tuple contains read counts after deduplication for R1 and R2
-        tuple val(deduped_reads_1), val(deduped_reads_2)
-        // Tuple contains read counts after host removal for R1 and R2
-        tuple val(nonHost_reads_1), val(nonHost_reads_2)
-        // Tuple contains the number of contigs and number of scaffolds.
-        tuple val(numContigs), val(numScaffolds)
+        // The summary string containing statistics collected as
+        // the pipeline ran.
+        val summary
         // The output directory.
         file outDir
 
     script:
     /*
-    The values provided are written to the summary file.
+    The summary statistics are written to the summary file.
     */
     """
     #!/bin/bash
 
-    echo "${base},${raw_reads_1},${trimmed_reads_1},${deduped_reads_1},${nonHost_reads_1},${raw_reads_2},${trimmed_reads_2},${deduped_reads_2},${nonHost_reads_2},${numContigs},${numScaffolds}" >> ${outDir}/stats-summary.csv
+    echo "${summary}" >> ${outDir}/stats-summary.csv
     """  
 
 }

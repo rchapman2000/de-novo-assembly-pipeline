@@ -231,7 +231,7 @@ workflow {
     QC_Report_Trimmed( Trimming.out[0], outDir, "FASTQC-Trimmed", params.threads )
 
     // Perform PCR Duplicate removal using prinseq.
-    Remove_PCR_Duplicates( Trimming.out[0], outDir )
+    Remove_PCR_Duplicates( Trimming.out[0], outDir, Trimming.out[2] )
 
     // Use FASTQC to perform a QC check on the deduped reads.
     QC_Report_Deduped( Remove_PCR_Duplicates.out[0], outDir, "FASTQC-Deduplicated", params.threads )
@@ -240,11 +240,11 @@ workflow {
     // that for alignment.
     if (params.host_fasta) {
         Index_Host_Reference( hostRefData, outDir, params.threads )
-        Host_Read_Removal( Remove_PCR_Duplicates.out[0], outDir, Index_Host_Reference.out, params.threads )
+        Host_Read_Removal( Remove_PCR_Duplicates.out[0], outDir, Index_Host_Reference.out, params.threads, Remove_PCR_Duplicates.out[2] )
     }
     // If the user supplied an existing bowtie2 index, use that for alignment.
     else {
-        Host_Read_Removal( Remove_PCR_Duplicates.out[0], outDir, hostRefIdxData, params.threads )
+        Host_Read_Removal( Remove_PCR_Duplicates.out[0], outDir, hostRefIdxData, params.threads, Remove_PCR_Duplicates.out[2] )
     }
 
     QC_Report_Host_Removed( Host_Read_Removal.out[0], outDir, "FASTQC-Host-Removed", params.threads )
@@ -253,24 +253,24 @@ workflow {
     // assembly
     if (params.unicycler != false) {
         // Performs de novo assembly using unicycler
-        Unicycler_Assembly( Host_Read_Removal.out[0], outDir, params.threads)
+        Unicycler_Assembly( Host_Read_Removal.out[0], outDir, params.threads, Host_Read_Removal.out[2])
         
         if (params.ref != false) {
             // Align the contigs to a reference genome using minimap2 and samtools
             Contig_Alignment( Unicycler_Assembly.out[0], outDir, refFile )
         }
 
-        Write_Summary(inputFiles_ch, Setup.out[1], Trimming.out[2], Remove_PCR_Duplicates.out[2], Host_Read_Removal.out[2], Unicycler_Assembly.out[1], outDir )
+        Write_Summary(Unicycler_Assembly.out[1], outDir )
     }
     else {
         // Perform de novo assembly using spades.
-        Spades_Assembly( Host_Read_Removal.out[0], outDir, params.threads )
+        Spades_Assembly( Host_Read_Removal.out[0], outDir, params.threads, Host_Read_Removal.out[2] )
         if (params.ref != false) {
             // Align the contigs to a reference genome using minimap2 and samtools
             Contig_Alignment( Spades_Assembly.out[0], outDir, refFile )
         }
 
-        Write_Summary(inputFiles_ch, Setup.out[1], Trimming.out[2], Remove_PCR_Duplicates.out[2], Host_Read_Removal.out[2], Spades_Assembly.out[2], outDir )
+        Write_Summary( Spades_Assembly.out[2], outDir )
     }
 
 }
