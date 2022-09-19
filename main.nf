@@ -125,7 +125,7 @@ else {
     // If the parameter is set, ensure that the directory provided ends
     // in a trailing slash (to keep things consistent throughout) the
     // pipeline code.
-    outDir = file(checkDirectoryEnding(params.output))
+    outDir = file(params.output).toString()
 }
 println outDir
 

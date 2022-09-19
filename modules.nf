@@ -12,7 +12,7 @@ process Setup {
         // the parameters file)
         val assembler
         // The output directory to be used.
-        file outDir
+        val outDir
         
     output:
         // The parameters file created.
@@ -64,7 +64,7 @@ process Index_Host_Reference {
         // Tuple contains the reference name and reference file.
         tuple val(refName), file(ref)
         // The output directory
-        file outDir
+        val outDir
         // The number of threads provided
         val threads
 
@@ -93,7 +93,7 @@ process QC_Report {
         // Tuple contains the file basename as well as the paired-end read files
         tuple val(base), file(F1), file(F2)
         // The output directory
-        file outDir
+        val outDir
         // The name of the directory to place the fastqc output into (allows
         // for this command to be used multiple times and to separate the output
         // i.e. pre-processed-reads vs trimmed-reads.)
@@ -125,7 +125,7 @@ process Trimming {
         // Tuple cotains the file basename as well as the paired-end read files.
         tuple val(base), file(R1), file(R2)
         // The output directory
-        file outDir
+        val outDir
         // The adapter file in fasta format.
         file adapters
         //The minimum read lenths to be allowed post trimming
@@ -196,7 +196,7 @@ process Remove_PCR_Duplicates {
         // Tuple contains the file basename and the two read files.
         tuple val(base), file(R1), file(R2)
         // The output directory
-        file outDir
+        val outDir
         // The existing summary file
         val existingSummary
     output:
@@ -250,7 +250,7 @@ process Host_Read_Removal {
         // Tuple contains the file basename and paired-end reads
         tuple val(base), file(R1), file(R2)
         // The output directory
-        file outDir
+        val outDir
         // Tuple contains the bt2 index directory and basename of the index files.
         tuple file(refDir), val(refName)
         // The number of threads provided.
@@ -291,8 +291,8 @@ process Host_Read_Removal {
 
     gzip ${base}_host_removed_1.fq ${base}_host_removed_2.fq
 
-    nonHost_reads_1=\$((\$(gunzip -c ${base}_deduped_1.fastq | wc -l)/4))
-    nonHost_reads_2=\$((\$(gunzip -c ${base}_deduped_2.fastq | wc -l)/4))
+    nonHost_reads_1=\$((\$(gunzip -c ${base}_host_removed_1.fastq | wc -l)/4))
+    nonHost_reads_2=\$((\$(gunzip -c ${base}_host_removed_2.fastq | wc -l)/4))
 
     total_nonHost=\$((\$nonHost_reads_1 + \$nonHost_reads_2))
 
@@ -306,7 +306,7 @@ process Spades_Assembly {
         // Tuple contains the file basename and paired-end reads.
         tuple val(base), file(R1), file(R2)
         // The output directory
-        file outDir
+        val outDir
         // The number of threads provided.
         val threads
         // The existing summary string
@@ -353,7 +353,7 @@ process Unicycler_Assembly {
         // Tuple contains the file basename and paired-end reads.
         tuple val(base), file(R1), file(R2)
         // The output directory
-        file outDir
+        val outDir
         // The number of threads provided.
         val threads
         // The existing summary string
@@ -401,7 +401,7 @@ process Contig_Alignment {
         // and the assembly fasta to align
         tuple val(base), file(assembly)
         // The output directory
-        file outDir
+        val outDir
         // the reference fasta file to be aligned to.
         file ref
 
@@ -428,6 +428,23 @@ process Contig_Alignment {
     """
 }
 
+//UNDER DEVELOPMENT
+/*
+process Contig_BLAST {
+    input:
+        tuple val(base), file(contigs)
+
+        val baseDir
+
+        val outDir
+    
+    script:
+    """
+    #!/bin/bash
+    """
+}
+*/
+
 // Writes a line to the summary file for the sample.
 process Write_Summary {
     input:
@@ -435,7 +452,7 @@ process Write_Summary {
         // the pipeline ran.
         val summary
         // The output directory.
-        file outDir
+        val outDir
 
     script:
     /*
