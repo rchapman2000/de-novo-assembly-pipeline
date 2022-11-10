@@ -291,8 +291,8 @@ process Host_Read_Removal {
 
     gzip ${base}_host_removed_1.fq ${base}_host_removed_2.fq
 
-    nonHost_reads_1=\$((\$(gunzip -c ${base}_host_removed_1.fastq | wc -l)/4))
-    nonHost_reads_2=\$((\$(gunzip -c ${base}_host_removed_2.fastq | wc -l)/4))
+    nonHost_reads_1=\$((\$(gunzip -c ${base}_host_removed_1.fq.gz | wc -l)/4))
+    nonHost_reads_2=\$((\$(gunzip -c ${base}_host_removed_2.fq.gz | wc -l)/4))
 
     total_nonHost=\$((\$nonHost_reads_1 + \$nonHost_reads_2))
 
@@ -336,11 +336,19 @@ process Spades_Assembly {
 
     spades.py --threads ${threads} -1 ${R1} -2 ${R2} -o ${base}-Assembly
 
-    mv ${base}-Assembly/contigs.fasta ./${base}-contigs.fasta
+    if [[ -f "${base}-Assembly/contigs.fasta" ]]; then
+        mv ${base}-Assembly/contigs.fasta ./${base}-contigs.fasta
+    else
+        touch ./${base}-contigs.fasta
+    fi
 
     num_contigs=\$(grep ">" ${base}-contigs.fasta | wc -l)
 
-    mv ${base}-Assembly/scaffolds.fasta ./${base}-scaffolds.fasta
+    if [[ -f "${base}-Assembly/scaffolds.fasta" ]]; then
+        mv ${base}-Assembly/scaffolds.fasta ./${base}-scaffolds.fasta
+    else
+        touch ./${base}-scaffolds.fasta
+    fi
 
     num_scaffolds=\$(grep ">" ${base}-scaffolds.fasta | wc -l)
 
