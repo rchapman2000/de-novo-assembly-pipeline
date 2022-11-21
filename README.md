@@ -46,6 +46,7 @@ The pipeline also supports the following optional arguments:
 | --ref | *Fasta File* | If provided a reference fasta file, this pipeline will align the generated contigs/scaffolds to this file using minimap2 |
 | --minCov | *int* | The minimum depth of coverage, below which a a position will be masked. [Default = 20] |
 | --minLen | *int* | The minimum length of a read (in base pairs) to keep post trimming. [Default = 75] |
+| --minTrimQual | *int* | Sets the average basecall quality threshold below which to trim a read. During trimming, trimmomatic performs a sliding window checking the average base quality, and removing the rest of the read if it drops below this treshold. [Default = 20] |
 | --threads | *int* | The number of threads that can be use to run pipeline tools in parallel. [Default = 1] |
 
 To view the list of options from the command line, use the following command:

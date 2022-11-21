@@ -24,13 +24,15 @@ HOST REMOVAL (ONE OF THE FOLLOWING IS [Required]):
     --host_bt2_index INDEX_DIRECTORY - To save time, an existing bowtie2 index can be supplied. Must be in its own directory
 
 OPTIONAL:
-    --unicycler - assembles reads using unicycler in place of spades
+    --unicycler - Assembles reads using unicycler in place of spades
 
-    --threads INT - the number of threads that can be use to run pipeline tools in parallel
+    --threads INT - The number of threads that can be use to run pipeline tools in parallel
 
     --ref REFERENCE_FASTA - The pipeline will align contigs produced by assembly to this reference
 
-    --minLen INT - the minimum length of a read to keep post trimming [Default = 75bp]
+    --minLen INT - The minimum length of a read to keep post trimming [Default = 75bp]
+
+    --minTrimQual INT - The average basecall quality threshold below which to trim a read. During trimming, trimmomatic performs a sliding window checking the average base quality, and removing the rest of the read if it drops below this treshold. [Default = 20]
     """
 }
 
@@ -70,6 +72,7 @@ params.output = false
 params.threads = 1
 params.unicycler = false
 params.minLen = 75
+params.minTrimQual = 20
 
 // Inports modules
 include { Setup } from "./modules.nf"
@@ -219,13 +222,13 @@ if (params.unicycler != false) {
 
 workflow {
 
-    Setup( hostRefName, params.minLen, assembler, outDir )
+    Setup( hostRefName, params.minLen, params.minTrimQual, assembler, outDir )
 
     // Use FASTQC to perform an initial QC check on the reads
     QC_Report( inputFiles_ch, outDir, "FASTQC-Pre-Processing", params.threads )
 
     // Perform adapter and quality trimming with Trimmomatic.
-    Trimming( inputFiles_ch, outDir, adapters, params.minLen )
+    Trimming( inputFiles_ch, outDir, adapters, params.minLen, params.minTrimQual)
 
     // Use FASTQC to perform a QC check on the trimmed reads.
     QC_Report_Trimmed( Trimming.out[0], outDir, "FASTQC-Trimmed", params.threads )

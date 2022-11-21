@@ -8,6 +8,9 @@ process Setup {
         // The minimum read length allowed post trimmming (for
         // use in the parameters file)
         val minLen
+        // The threshold below which a read is trimmed while
+        // performing sliding window trimming
+        val minTrimQual
         // The name of the assembler used (for use in
         // the parameters file)
         val assembler
@@ -31,7 +34,8 @@ process Setup {
     The parameters file contains:
         1. The name of the reference supplied
         2. The minimum read length allowed after trimmming
-        3. The assembler used
+        3. The threshold below which a read is trimmed 
+        4. The assembler used
 
     The summary file contains:
         1. The sample
@@ -49,6 +53,7 @@ process Setup {
 
     echo "Host Genome : ${refName}" >> analysis-parameters.txt
     echo "Minimum Read Length Allowed : ${minLen} bp" >> analysis-parameters.txt
+    echo "Trimming Quality Threshold : ${minTrimQual}" >> analysis-parameters.txt
     echo "Assember : ${assembler}" >> analysis-parameters.txt
 
     touch stats-summary.csv
@@ -130,6 +135,9 @@ process Trimming {
         file adapters
         //The minimum read lenths to be allowed post trimming
         val minLen
+        // The threshold below which a read is trimmed while
+        // performing sliding window trimming
+        val minTrimQual
 
     output:
         // Tuple containing the file basename and the trimmed forward and reverse reads
@@ -176,7 +184,7 @@ process Trimming {
 
     trimmomatic PE ${R1} ${R2} ${base}_1.trimmed.fastq ${base}_1.unpaired.fastq \
     ${base}_2.trimmed.fastq ${base}_2.unpaired.fastq ILLUMINACLIP:${adapters}:2:30:10:1:true \
-    LEADING:5 TRAILING:5 SLIDINGWINDOW:4:20 MINLEN:${minLen}
+    LEADING:5 TRAILING:5 SLIDINGWINDOW:4:${minTrimQual} MINLEN:${minLen}
 
     gzip ${base}_1.unpaired.fastq ${base}_2.unpaired.fastq
     
