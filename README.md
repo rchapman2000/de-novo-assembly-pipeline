@@ -34,7 +34,7 @@ conda env update --file environment.yml --prune
 
 To run the pipeline, use the following command:
 ```
-nextflow run main.nf [options] --input INPUT_DIR --output OUTPUT_DIR [--host_fasta HOST_FASTA | --host_bt2_index INDEX_DIR]
+nextflow run main.nf [options] --input INPUT_DIR --output OUTPUT_DIR
 ```
 
 ### Options
