@@ -10,7 +10,7 @@ Takes an input of paired-end fastq files from illumina
 sequencers, processes the reads, removes host contamination,
 and performs a de novo assembly.
 
-USAGE: nextflow run main.nf [options] --input INPUT_DIR --output OUTPUT_DIR [--host_fasta HOST_FASTA | --host_bt2_index INDEX_DIR]
+USAGE: nextflow run main.nf [options] --input INPUT_DIR --output OUTPUT_DIR
 
 OPTIONS:
 
@@ -18,12 +18,12 @@ OPTIONS:
 
 --output OUTPUT_DIR - [Required] A directory to place output files (If not existing, pipeline will create)
 
-HOST REMOVAL (ONE OF THE FOLLOWING IS [Required]):
-    --host_fasta HOST_FASTA - A host fasta file that the reads will be aligned to to remove host contamination
-            
-    --host_bt2_index INDEX_DIRECTORY - To save time, an existing bowtie2 index can be supplied. Must be in its own directory
-
 OPTIONAL:
+
+    --host_fasta HOST_FASTA - A host fasta file that the reads will be aligned to to remove host contamination.
+            
+    --host_bt2_index INDEX_DIRECTORY - A directory containing an existing bowtie2 index to be used for host read removal. Must be in its own directory. If using a large genome, this option will greatly improve the pipeline runtime.
+
     --unicycler - Assembles reads using unicycler in place of spades
 
     --threads INT - The number of threads that can be use to run pipeline tools in parallel
@@ -51,6 +51,32 @@ def checkDirectoryEnding (fileName) {
     
     // Return the directory name.
     return fileName
+}
+
+// Function creates the header for the summary file based on the parameters
+// supplied by the user. Because the pipeline dynamically changes based on
+// what the user specifies, the summary file must also be alter to reflect
+// the analysis. This will also make incorporating new modules easier.
+def createSummaryHeader (hostRef, hostIdx) {
+    
+    // The header will always start with the sample.
+    FinalHeader = 'Sample,'
+
+    // The summary sheet will also always contain the Raw and trimmed read counts.
+    FinalHeader = FinalHeader + "Raw Reads,Trimmed Reads,Deduped Reads,"
+
+    // Next, the user may supply host removal, which would be the next useful
+    // statistic to know. Thus, if a host reference or bowtie2 index is supplied,
+    // add this field to the header.
+    if (hostRef != false || hostIdx != false) {
+        FinalHeader = FinalHeader + "Non-Host Reads,"
+    }
+
+
+    // Finally, the pipeline will always report the number of contigs and scaffolds
+    FinalHeader = FinalHeader + "Contigs Generated,Scaffolds Generated"
+
+    return FinalHeader
 }
 
 // If the help parameter is supplied, link display the help message
@@ -94,6 +120,7 @@ include { Write_Summary } from './modules.nf'
 adapters = file("${baseDir}/adapters.fa")
 
 // Checks the input parameter
+inDir = ""
 if (params.input == false) {
     // If the parameter is not set, notify the user and exit.
     println "ERROR: No input directory provided. Pipeline requires an input directory."
@@ -104,14 +131,17 @@ else if (!(file(params.input).isDirectory())) {
     println "ERROR: ${params.input} is not an existing directory."
     exit(1)
 }
+else {
+    inDir = file(params.input).toString()
+}
 
-println "Input Directory: ${params.input}"
+println "Input Directory: ${inDir}"
 
 // Create a channel for hte input files.
 inputFiles_ch = Channel
     // Pull from pairs of files (illumina fastq files denoted by having R1 or R2 in
     // the file name).
-    .fromFilePairs("${params.input}*_R{1,2}*.fastq.gz")
+    .fromFilePairs("${inDir}/*_R{1,2}*.fastq*")
     // The .fromFilePairs() function spits out a list where the first 
     // item is the base file name, and the second is a list of the files.
     // This command creates a tuple with the base file name and two files.
@@ -139,67 +169,60 @@ println outDir
 // step and the alignment step.
 hostRefData = ''
 hostRefIdxData = ''
-hostRefName = ''
-if (params.host_fasta == false && params.host_bt2_index == false) {
-    // If both options are not supplied, notify the user and exit.
-    println "ERROR: no host reference file or bowtie2 index proivded. Pipeline requires either a reference fasta file or bowtie2 index."
-    exit(1)
-}
-else if (params.host_fasta != false && params.host_bt2_index != false) {
+hostRefName = 'NONE'
+if (params.host_fasta != false && params.host_bt2_index != false) {
     // If both options are supplied, notify the user and exit.
     println "ERROR: you have specified both a host fasta file and bowtie2 index. Please only supply one."
     exit(1)
 }
-else {
-    // If the user supplied the --host_fasta option
-    if (params.host_fasta != false) {
-        if (!(file(params.host_fasta).exists())) {
-            // If the file supplied does not exist, notify the user and exit.
-            println "ERROR: ${params.host_fasta} does not exist."
-            exit(1)
-        }
-        else {
-            // Parse the file into a file object
-            hostRef = file(params.host_fasta)
-            // Use the getBaseName() function to 
-            // get the reference name. This will be
-            // used to name the bowtie2 index.
-            hostRefName = hostRef.getBaseName()
-            // Place these both into a tuple.
-            hostRefData = tuple(hostRefName, hostRef)
-        }
+else if (params.host_fasta != false) {
+    if (!(file(params.host_fasta).exists())) {
+        // If the file supplied does not exist, notify the user and exit.
+        println "ERROR: ${params.host_fasta} does not exist."
+        exit(1)
     }
-    // If the user supplied the --host_bt2_index
     else {
-        if (!(file(params.host_bt2_index).exists())) {
-            // If the index provided does not exist, notify the user and exit.
-            println "Error: ${params.host_bt2_idx} does not exist."
+        // Parse the file into a file object
+        hostRef = file(params.host_fasta)
+        // Use the getBaseName() function to 
+        // get the reference name. This will be
+        // used to name the bowtie2 index.
+        hostRefName = hostRef.getBaseName()
+        // Place these both into a tuple.
+        hostRefData = tuple(hostRefName, hostRef)
+    }
+}
+// If the user supplied the --host_bt2_index
+else if (params.host_bt2_index != false) {
+    if (!(file(params.host_bt2_index).exists())) {
+        // If the index provided does not exist, notify the user and exit.
+        println "Error: ${params.host_bt2_idx} does not exist."
+        exit(1)
+    }
+    else {
+        // Parse the directory into a file object
+        hostRefDir = file(params.host_bt2_index)
+        println hostRefDir
+        // Grab a list of file objects from the directory
+        // ending in .bt2
+        indexFiles = file("${hostRefDir}/*.bt2")
+        if (indexFiles.size() == 0){
+            // If there are no file in the directory ending in bt2, notify the user and exit
+            println "Index Directory provided (${params.host_bt2_index}) does not contain any bt2 files"
             exit(1)
         }
         else {
-            // Parse the directory into a file object
-            hostRefDir = file(params.host_bt2_index)
-            println hostRefDir
-            // Grab a list of file objects from the directory
-            // ending in .bt2
-            indexFiles = file("${hostRefDir}/*.bt2")
-            if (indexFiles.size() == 0){
-                // If there are no file in the directory ending in bt2, notify the user and exit
-                println "Index Directory provided (${params.host_bt2_index}) does not contain any bt2 files"
-                exit(1)
-            }
-            else {
-                // Use the getSimpleName() function to grab the base name
-                // of the index files (getSimpleName() removes anything following
-                // the last . in a file name.)
-                hostRefName = indexFiles[0].getSimpleName()
-                println hostRefName
-                // Place the index dir and name into a tuple.
-                hostRefIdxData = tuple(hostRefDir, hostRefName)
-            }
+            // Use the getSimpleName() function to grab the base name
+            // of the index files (getSimpleName() removes anything following
+            // the last . in a file name.)
+            hostRefName = indexFiles[0].getSimpleName()
+            println hostRefName
+            // Place the index dir and name into a tuple.
+            hostRefIdxData = tuple(hostRefDir, hostRefName)
         }
     }
 }
+
 
 // Parses the ref option.
 refFile = ''
@@ -220,9 +243,11 @@ if (params.unicycler != false) {
     assembler = "Unicycler"
 }
 
+summaryHeader = createSummaryHeader(params.host_fasta, params.host_bt2_index)
+
 workflow {
 
-    Setup( hostRefName, params.minLen, params.minTrimQual, assembler, outDir )
+    Setup( summaryHeader, hostRefName, params.minLen, params.minTrimQual, assembler, outDir )
 
     // Use FASTQC to perform an initial QC check on the reads
     QC_Report( inputFiles_ch, outDir, "FASTQC-Pre-Processing", params.threads )
@@ -244,36 +269,86 @@ workflow {
     if (params.host_fasta) {
         Index_Host_Reference( hostRefData, outDir, params.threads )
         Host_Read_Removal( Remove_PCR_Duplicates.out[0], outDir, Index_Host_Reference.out, params.threads, Remove_PCR_Duplicates.out[2] )
+        QC_Report_Host_Removed( Host_Read_Removal.out[0], outDir, "FASTQC-Host-Removed", params.threads )
+
+        // If the user supplied the --unicycler parameter, use unicycler for
+        // assembly
+        if (params.unicycler != false) {
+            // Performs de novo assembly using unicycler
+            Unicycler_Assembly( Host_Read_Removal.out[0], outDir, params.threads, Host_Read_Removal.out[2])
+            
+            if (params.ref != false) {
+                // Align the contigs to a reference genome using minimap2 and samtools
+                Contig_Alignment( Unicycler_Assembly.out[0], outDir, refFile )
+            }
+
+            Write_Summary(Unicycler_Assembly.out[1], outDir )
+        }
+        else {
+            // Perform de novo assembly using spades.
+            Spades_Assembly( Host_Read_Removal.out[0], outDir, params.threads, Host_Read_Removal.out[2] )
+            if (params.ref != false) {
+                // Align the contigs to a reference genome using minimap2 and samtools
+                Contig_Alignment( Spades_Assembly.out[0], outDir, refFile )
+            }
+
+            Write_Summary( Spades_Assembly.out[2], outDir )
+        }
     }
     // If the user supplied an existing bowtie2 index, use that for alignment.
-    else {
+    else if (params.host_bt2_index) {
         Host_Read_Removal( Remove_PCR_Duplicates.out[0], outDir, hostRefIdxData, params.threads, Remove_PCR_Duplicates.out[2] )
-    }
+        QC_Report_Host_Removed( Host_Read_Removal.out[0], outDir, "FASTQC-Host-Removed", params.threads )
 
-    QC_Report_Host_Removed( Host_Read_Removal.out[0], outDir, "FASTQC-Host-Removed", params.threads )
+        // If the user supplied the --unicycler parameter, use unicycler for
+        // assembly
+        if (params.unicycler != false) {
+            // Performs de novo assembly using unicycler
+            Unicycler_Assembly( Host_Read_Removal.out[0], outDir, params.threads, Host_Read_Removal.out[2])
+            
+            if (params.ref != false) {
+                // Align the contigs to a reference genome using minimap2 and samtools
+                Contig_Alignment( Unicycler_Assembly.out[0], outDir, refFile )
+            }
 
-    // If the user supplied the --unicycler parameter, use unicycler for
-    // assembly
-    if (params.unicycler != false) {
-        // Performs de novo assembly using unicycler
-        Unicycler_Assembly( Host_Read_Removal.out[0], outDir, params.threads, Host_Read_Removal.out[2])
-        
-        if (params.ref != false) {
-            // Align the contigs to a reference genome using minimap2 and samtools
-            Contig_Alignment( Unicycler_Assembly.out[0], outDir, refFile )
+            Write_Summary(Unicycler_Assembly.out[1], outDir )
         }
+        else {
+            // Perform de novo assembly using spades.
+            Spades_Assembly( Host_Read_Removal.out[0], outDir, params.threads, Host_Read_Removal.out[2] )
+            if (params.ref != false) {
+                // Align the contigs to a reference genome using minimap2 and samtools
+                Contig_Alignment( Spades_Assembly.out[0], outDir, refFile )
+            }
 
-        Write_Summary(Unicycler_Assembly.out[1], outDir )
+            Write_Summary( Spades_Assembly.out[2], outDir )
+        }
     }
     else {
-        // Perform de novo assembly using spades.
-        Spades_Assembly( Host_Read_Removal.out[0], outDir, params.threads, Host_Read_Removal.out[2] )
-        if (params.ref != false) {
-            // Align the contigs to a reference genome using minimap2 and samtools
-            Contig_Alignment( Spades_Assembly.out[0], outDir, refFile )
-        }
 
-        Write_Summary( Spades_Assembly.out[2], outDir )
+        // If the user supplied the --unicycler parameter, use unicycler for
+        // assembly
+        if (params.unicycler != false) {
+            // Performs de novo assembly using unicycler
+            Unicycler_Assembly( Remove_PCR_Duplicates.out[0], outDir, params.threads, Remove_PCR_Duplicates.out[2])
+            
+            if (params.ref != false) {
+                // Align the contigs to a reference genome using minimap2 and samtools
+                Contig_Alignment( Unicycler_Assembly.out[0], outDir, refFile )
+            }
+
+            Write_Summary(Unicycler_Assembly.out[1], outDir )
+        }
+        else {
+            // Perform de novo assembly using spades.
+            Spades_Assembly( Remove_PCR_Duplicates.out[0], outDir, params.threads, Remove_PCR_Duplicates.out[2] )
+            if (params.ref != false) {
+                // Align the contigs to a reference genome using minimap2 and samtools
+                Contig_Alignment( Spades_Assembly.out[0], outDir, refFile )
+            }
+
+            Write_Summary( Spades_Assembly.out[2], outDir )
+        }
     }
 
 }

@@ -2,6 +2,8 @@
 // be added to later
 process Setup {
     input:
+        // The header to write to the summary file.
+        val summaryHeader
         // The name of the reference supplied (for use
         // in the parameters file)
         val refName
@@ -51,14 +53,14 @@ process Setup {
 
     touch analysis-parameters.txt
 
-    echo "Host Genome : ${refName}" >> analysis-parameters.txt
     echo "Minimum Read Length Allowed : ${minLen} bp" >> analysis-parameters.txt
     echo "Trimming Quality Threshold : ${minTrimQual}" >> analysis-parameters.txt
     echo "Assember : ${assembler}" >> analysis-parameters.txt
+    echo "Host Genome : ${refName}" >> analysis-parameters.txt
 
     touch stats-summary.csv
 
-    echo "Sample,Raw Reads,Trimmed Reads,Deduped Reads,Non-Host Reads,Contigs Generated,Scaffolds Generated" > stats-summary.csv
+    echo "${summaryHeader}" > stats-summary.csv
     """
 }
 

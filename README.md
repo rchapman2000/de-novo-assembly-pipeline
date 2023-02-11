@@ -43,8 +43,9 @@ The pipeline also supports the following optional arguments:
 | Option | Type | Description |
 |---|---|---|
 | --unicycler | *None* | This pipeline also supports assembly using the tool unicycler. Supplying this option will use unicycler as opposed to SPADES (Default). |
+| --host_fasta | *Fasta File* | A host fasta file that the reads will be aligned to to remove host contamination. If genome is large, creating this index will slow the pipeline. |
+| --host_bt2_index | *Directory* | A directory containing an existing bowtie2 index to be used for host read removal. Must be in its own directory. If using a large genome, this option will greatly improve the pipeline runtime. |
 | --ref | *Fasta File* | If provided a reference fasta file, this pipeline will align the generated contigs/scaffolds to this file using minimap2 |
-| --minCov | *int* | The minimum depth of coverage, below which a a position will be masked. [Default = 20] |
 | --minLen | *int* | The minimum length of a read (in base pairs) to keep post trimming. [Default = 75] |
 | --minTrimQual | *int* | Sets the average basecall quality threshold below which to trim a read. During trimming, trimmomatic performs a sliding window checking the average base quality, and removing the rest of the read if it drops below this treshold. [Default = 20] |
 | --threads | *int* | The number of threads that can be use to run pipeline tools in parallel. [Default = 1] |
