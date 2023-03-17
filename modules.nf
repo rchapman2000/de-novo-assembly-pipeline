@@ -179,8 +179,8 @@ process Trimming {
     """
     #!/bin/bash
 
-    raw_reads_1=\$((\$(gunzip -c ${R1} | wc -l)/4))
-    raw_reads_2=\$((\$(gunzip -c ${R1} | wc -l)/4))
+    raw_reads_1=\$((\$(zcat -f ${R1} | wc -l)/4))
+    raw_reads_2=\$((\$(zcat -f ${R2} | wc -l)/4))
 
     total_raw=\$((\$raw_reads_1 + \$raw_reads_2))
 
